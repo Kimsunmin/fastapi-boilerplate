@@ -15,3 +15,10 @@ logs/
 
 # Environment variables
 .env
+!.env.example
+
+# Database
+db.sqlite3
+
+# Docker
+.dockerignore

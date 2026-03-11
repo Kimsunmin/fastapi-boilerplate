@@ -1,0 +1,32 @@
+services:
+  rdf-parser-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: runtime
+    image: rdf-parser-api:latest
+    container_name: rdf-parser-api
+    restart: unless-stopped
+    ports:
+      - "${APP_PORT:-8000}:8000"
+    env_file:
+      - .env
+    environment:
+      - ENV=${ENV:-production}
+    volumes:
+      - logs:/app/logs
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+    networks:
+      - app-network
+
+volumes:
+  logs:
+
+networks:
+  app-network:
+    driver: bridge
