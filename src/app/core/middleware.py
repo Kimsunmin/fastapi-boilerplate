@@ -1,4 +1,6 @@
+import re
 import time
+from uuid import uuid4
 
 from fastapi import Request
 from loguru import logger
@@ -32,6 +34,7 @@ async def log_requests(request: Request, call_next):
         status_color = "green"
 
     message = (
+        "[Request ID: <magenta>{}</magenta>] "
         "<blue>{}</blue> | "
         "<cyan>{}</cyan> {} "
         f"<{status_color}>{{}}</{status_color}> | "
@@ -41,6 +44,7 @@ async def log_requests(request: Request, call_next):
     if status_code >= 500:
         logger.opt(colors=True).error(
             message,
+            request.state.request_id,
             client_ip,
             request.method,
             path,
@@ -50,6 +54,7 @@ async def log_requests(request: Request, call_next):
     elif status_code >= 400:
         logger.opt(colors=True).warning(
             message,
+            request.state.request_id,
             client_ip,
             request.method,
             path,
@@ -59,6 +64,7 @@ async def log_requests(request: Request, call_next):
     else:
         logger.opt(colors=True).info(
             message,
+            request.state.request_id,
             client_ip,
             request.method,
             path,
@@ -66,4 +72,16 @@ async def log_requests(request: Request, call_next):
             duration,
         )
 
+    return response
+
+async def request_id_middleware(request: Request, call_next):
+    request_id = request.headers.get("X-Request-ID")
+
+    if not request_id:
+        request_id = str(uuid4())
+        
+    request.state.request_id = request_id
+    response = await call_next(request)
+    
+    response.headers["X-Request-ID"] = request_id
     return response
