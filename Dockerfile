@@ -18,26 +18,20 @@ FROM python:3.11-slim-bookworm AS runtime
 
 WORKDIR /app
 
-# 보안: non-root 사용자 생성
-RUN groupadd --gid 1001 appgroup && \
-    useradd --uid 1001 --gid appgroup --no-create-home appuser
-
 # 빌더 스테이지에서 가상환경만 복사
 COPY --from=builder /app/.venv /app/.venv
 
 # 소스코드 복사
 COPY src/ ./src/
 
-# 로그 디렉토리 생성 및 권한 설정
-RUN mkdir -p logs && chown -R appuser:appgroup /app
+# 로그 디렉토리 생성
+RUN mkdir -p logs
 
 # 환경변수 설정
 ENV PATH="/app/.venv/bin:$PATH" \
     PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     ENV=production
-
-USER appuser
 
 EXPOSE 8000
 
