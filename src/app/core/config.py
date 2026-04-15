@@ -8,6 +8,7 @@ class Settings(BaseSettings):
 
     APP_NAME: str = "fastapi-boilerplate"
     API_PREFIX: str = "/api/v1"
+    APP_PORT: int = 8000
 
     DB_URL: str = "sqlite:///./db.sqlite3"
     
