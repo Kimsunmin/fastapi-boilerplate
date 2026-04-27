@@ -1,11 +1,11 @@
 services:
-  rdf-parser-api:
+  api:
     build:
       context: .
       dockerfile: Dockerfile
       target: runtime
-    image: rdf-parser-api:latest
-    container_name: rdf-parser-api
+    image: ${DOCKER_IMAGE_NAME:-fastapi-boilerplate}:${DOCKER_IMAGE_TAG:-latest}
+    container_name: ${DOCKER_CONTAINER_NAME:-fastapi-boilerplate}
     restart: unless-stopped
     ports:
       - "${APP_PORT:-8000}:8000"

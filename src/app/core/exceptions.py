@@ -1,4 +1,5 @@
-from fastapi import status
+from fastapi import FastAPI, Request, status
+from fastapi.responses import JSONResponse
 
 
 class AppException(Exception):
@@ -62,4 +63,20 @@ class ConflictException(AppException):
             code=code,
             message=message,
             status_code=status.HTTP_409_CONFLICT,
+        )
+
+
+def register_exception_handlers(app: FastAPI) -> None:
+    """FastAPI 앱에 전역 예외 핸들러를 등록합니다."""
+
+    @app.exception_handler(AppException)
+    async def app_exception_handler(request: Request, exc: AppException):
+        return JSONResponse(
+            status_code=exc.status_code,
+            content={
+                "status": "error",
+                "code": exc.code,
+                "message": exc.message,
+                "data": exc.data,
+            },
         )

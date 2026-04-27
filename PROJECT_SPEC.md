@@ -1,420 +1,100 @@
-# FastAPI REST API Boilerplate
+# Project Specification
 
-이 프로젝트는 **FastAPI 기반 REST API 서비스를 빠르게 시작하기 위한 보일러플레이트**입니다.
-프로젝트의 목표는 다음과 같습니다.
-
-* API 서버를 **일관된 구조로 빠르게 시작**
-* 코드의 **책임 분리(Separation of Concerns)**
-* 프로젝트가 커져도 **구조가 무너지지 않도록 설계**
-* 새로운 개발자가 프로젝트를 봤을 때 **어디에 무엇을 작성해야 하는지 명확하게 이해**
-
-이 문서는 **프로젝트 구조, 각 영역의 역할, 코드 작성 컨벤션**을 설명합니다.
-이 문서와 프로젝트 구조만 보면 “어디에 어떤 코드를 작성해야 하는지” 바로 이해할 수 있도록 하는 것이 목표입니다.
+> 이 문서는 **LLM/코딩 에이전트가 이 프로젝트의 구조와 규칙을 일관되게 따륏도록 하기 위한 기술 명세**입니다.
+> 프로젝트를 확장하거나 수정할 때 이 문서를 컨텍스트로 제공하세요.
 
 ---
 
-# 1. 기술 스택
+## 1. 프로젝트 개요
 
-현재 프로젝트는 다음 라이브러리를 기반으로 합니다.
-
-### Runtime dependencies
-
-* fastapi
-* uvicorn
-* sqlalchemy
-* alembic
-* pydantic-settings
-* httpx
-* loguru
-
-### Dev dependencies
-
-* pytest
-* ruff
-* mypy
-* httpx (테스트용)
+| 항목 | 내용 |
+|------|------|
+| **프로젝트명** | fastapi-boilerplate |
+| **버전** | 0.1.0 |
+| **프레임워크** | FastAPI |
+| **Python** | >= 3.11 |
+| **패키지 관리** | uv |
 
 ---
 
-# 2. 프로젝트 구조
+## 2. 아키텍처 원칙
 
-```
-src/
- └── app/
-     ├── main.py
-     ├── api/
-     │   ├── router.py
-     │   └── v1/
-     │       ├── health.py
-     │       └── users.py
-     │
-     ├── core/
-     │   ├── config.py
-     │   ├── logging.py
-     │   └── exceptions.py
-     │
-     ├── dependencies/
-     │   ├── auth.py
-     │   ├── services.py
-     │   └── pagination.py
-     │
-     ├── domain/
-     │   └── users/
-     │       ├── schemas.py
-     │       ├── service.py
-     │       └── repository.py
-     │
-     ├── db/
-     │   ├── base.py
-     │   ├── session.py
-     │   └── models/
-     │       └── user.py
-     │
-     ├── integrations/
-     │   └── external_api.py
-     │
-     └── common/
-         ├── responses.py
-         └── pagination.py
-
-tests/
-```
+1. **책임 분리 (Separation of Concerns)**
+2. **비즈니스 로직 중심 구조**
+3. **확장 가능한 디렉토리 구조**
+4. **일관된 코드 작성 방식**
 
 ---
 
-# 3. 요청 처리 흐름
+## 3. 레이어 구조 및 규칙
 
-API 요청은 아래와 같은 흐름을 따릅니다.
+### 3.1 요청 처리 흐름
 
 ```
 Client Request
     ↓
-api (router)
+api (router)        ← URL 정의, validation, 응답 반환만
     ↓
-dependencies
+dependencies        ← FastAPI Depends() 주입 (service 생성, auth 등)
     ↓
-domain/service
+domain/service      ← 비즈니스 규칙 (중복 검사, 상태 검증, 정책)
     ↓
-domain/repository
+domain/repository   ← DB 접근 (조회, 저장)
     ↓
-db
+db                  ← SQLAlchemy 모델, session
 ```
 
-외부 시스템 호출이 필요한 경우:
+외부 시스템 호출 시:
 
 ```
 service
   ↓
-integrations
+integrations        ← 외부 API, Redis, S3 등
 ```
 
-각 레이어는 **명확한 책임을 가지고 분리되어야 합니다.**
+### 3.2 각 레이어의 절대 금지 사항
+
+| 레이어 | 하면 안 되는 것 |
+|--------|----------------|
+| `api/` | DB 쿼리, 복잡한 비즈니스 로직, 외부 API 호출 |
+| `domain/service/` | SQL 직접 작성, httpx 직접 호출 |
+| `domain/repository/` | 비즈니스 규칙 포함 |
+| `db/` | 비즈니스 규칙 포함 |
+| `core/` | 특정 도메인에 종속된 코드 |
 
 ---
 
-# 4. 각 영역의 역할
-
-## main.py
-
-애플리케이션의 **엔트리포인트**입니다.
-
-여기서는 다음 작업만 수행합니다.
-
-* FastAPI 앱 생성
-* router 등록
-* middleware 등록
-* startup / shutdown 처리
-* 예외 핸들러 등록
-
-중요한 원칙:
-
-main.py에는 **비즈니스 로직을 작성하지 않습니다.**
-
----
-
-## api/
-
-HTTP 요청을 처리하는 **API 계층**입니다.
-
-여기서는 다음을 담당합니다.
-
-* URL 경로 정의
-* HTTP method 정의
-* 요청 데이터 검증
-* 서비스 호출
-* 응답 반환
-
-예시
+## 4. 디렉토리 구조
 
 ```
-GET /api/v1/users
-POST /api/v1/users
-```
+src/app/
+ ├── main.py              # 엔트리포인트. 앱 생성, router/middleware/예외핸들러 등록만
+ ├── api/
+ │   ├── route.py         # APIRouter 집합. 모든 v1 router를 include
+ │   └── v1/
+ │       └── *.py         # 엔드포인트 정의. 얇게 유지
+ ├── core/
+ │   ├── config.py        # pydantic-settings 기반 환경 설정
+ │   ├── exceptions.py    # AppException 기반 예외 클래스 + 핸들러 등록 함수
+ │   ├── logging.py       # loguru 설정
+ │   └── middleware.py    # 커스텀 미들웨어 (request_id, logging 등)
+ ├── dependencies/
+ │   └── *.py             # FastAPI Depends()로 주입되는 함수들
+ ├── domain/
+ │   └── {도메인명}/
+ │       ├── schemas.py   # Pydantic 모델 (요청/응답)
+ │       ├── service.py   # 비즈니스 로직
+ │       └── repository.py # DB 접근 로직
+ ├── db/
+ │   ├── base.py          # SQLAlchemy declarative base
+ │   ├── session.py       # DB 연결, session 관리
+ │   └── models/
+ │       └── *.py         # SQLAlchemy 모델
+ ├── integrations/
+ │   └── *.py             # 외부 시스템 연동
+ └── common/
+     └── *.py             # 공통 유틸 (응답 포맷, pagination, enum 등)
 
-router는 가능한 한 **얇게 유지해야 합니다.**
-
-router에서 다음과 같은 코드는 작성하지 않습니다.
-
-* DB 쿼리
-* 복잡한 비즈니스 로직
-* 외부 API 호출 로직
-
----
-
-## core/
-
-애플리케이션 전반에서 사용하는 **기반 구성 요소**입니다.
-
-예:
-
-* 환경 설정
-* 로깅 설정
-* 보안 관련 유틸
-* 공통 예외 처리
-* middleware
-
-대표 파일
-
-```
-config.py
-logging.py
-exceptions.py
-```
-
-core는 **특정 도메인에 종속되지 않는 코드**만 포함해야 합니다.
-
----
-
-## dependencies/
-
-FastAPI의 `Depends()`로 **주입되는 구성 요소**를 모아두는 공간입니다.
-
-예를 들면 다음과 같은 것들이 있습니다.
-
-* 현재 사용자 조회
-* 권한 검사
-* pagination 파라미터
-* 서비스 생성
-
-예시
-
-```python
-def get_user_service(db: Session = Depends(get_db)):
-    repo = UserRepository(db)
-    return UserService(repo)
-```
-
-dependencies는 **비즈니스 로직을 수행하는 곳이 아닙니다.**
-
----
-
-## domain/
-
-프로젝트의 **핵심 비즈니스 로직**이 위치하는 영역입니다.
-
-도메인 기준으로 디렉토리를 나눕니다.
-
-예
-
-```
-domain/
- └── users/
-```
-
-각 도메인은 다음 파일로 구성됩니다.
-
-```
-schemas.py
-service.py
-repository.py
-```
-
-### schemas
-
-입출력 데이터 모델
-
-예:
-
-* 요청 payload
-* 응답 구조
-
-### service
-
-비즈니스 규칙을 담당합니다.
-
-예:
-
-* 이메일 중복 검사
-* 상태 검증
-* 정책 적용
-
-### repository
-
-데이터 접근 로직을 담당합니다.
-
-예:
-
-* DB 조회
-* DB 저장
-
----
-
-## db/
-
-데이터베이스 관련 설정과 모델을 정의합니다.
-
-예
-
-```
-base.py
-session.py
-models/
-```
-
-### base.py
-
-ORM base 클래스 정의
-
-### session.py
-
-DB 연결 및 session 관리
-
-### models/
-
-SQLAlchemy 모델 정의
-
-db 레이어는 **비즈니스 규칙을 포함하지 않습니다.**
-
----
-
-## integrations/
-
-외부 시스템과 연동하는 코드를 분리합니다.
-
-예
-
-* 외부 REST API
-* OpenSearch
-* Redis
-* S3
-
-service에서 외부 시스템을 호출할 경우
-직접 구현하지 않고 integrations 레이어를 사용합니다.
-
----
-
-## common/
-
-프로젝트 전체에서 사용하는 공통 유틸리티를 둡니다.
-
-예
-
-* 공통 응답 포맷
-* pagination 응답
-* 공통 enum
-* helper 함수
-
----
-
-# 5. 코드 작성 컨벤션
-
-## 1. Router는 얇게 유지한다
-
-router는 다음 역할만 수행합니다.
-
-* 요청 수신
-* validation
-* service 호출
-* 응답 반환
-
-예
-
-```python
-@router.post("")
-def create_user(payload: UserCreate, service: UserService = Depends(get_user_service)):
-    return service.create_user(payload)
-```
-
----
-
-## 2. 비즈니스 로직은 service에 작성
-
-비즈니스 규칙은 반드시 service에 위치해야 합니다.
-
-예
-
-```
-domain/users/service.py
-```
-
----
-
-## 3. DB 접근은 repository에서만 수행
-
-service에서 직접 SQL을 작성하지 않습니다.
-
-```
-service → repository → db
-```
-
----
-
-## 4. 외부 API 호출은 integrations 사용
-
-service에서 직접 httpx를 호출하지 않습니다.
-
-```
-service → integrations → external api
-```
-
----
-
-## 5. 환경 설정은 core/config에서 관리
-
-`.env` 값을 직접 읽지 않습니다.
-
-반드시 settings 객체를 사용합니다.
-
----
-
-## 6. 도메인 단위로 구조를 확장
-
-새로운 기능이 생기면 domain 기준으로 디렉토리를 추가합니다.
-
-예
-
-```
-domain/orders
-domain/products
-domain/payments
-```
-
----
-
-# 6. API 버전 관리
-
-API는 버전 기준으로 관리합니다.
-
-```
-api/v1/
-api/v2/
-```
-
-main에서 prefix를 설정합니다.
-
-```
-/api/v1
-```
-
----
-
-# 7. 테스트 구조
-
-테스트 코드는 `tests` 디렉토리에 작성합니다.
-
-예
-
-```
 tests/
  ├── api/
  ├── domain/
@@ -423,57 +103,133 @@ tests/
 
 ---
 
-# 8. 실행 방법
+## 5. 코드 작성 규칙
 
+### 5.1 Router는 얇게 유지
 
-## 개발 서버 실행
+```python
+# ✅ 올바른 예
+@router.post("")
+def create_user(payload: UserCreate, service: UserService = Depends(get_user_service)):
+    return service.create_user(payload)
 
-아래 명령어로 FastAPI 개발 서버를 실행할 수 있습니다.
+# ❌ 잘못된 예: DB 쿼리, 비즈니스 로직, 외부 API 호출 금지
+```
+
+### 5.2 비즈니스 로직은 service에
+
+- 이메일 중복 검사
+- 상태 검증
+- 정책 적용
+
+### 5.3 DB 접근은 repository에서만
 
 ```
-uvicorn app.main:app --app-dir src --reload --no-access-log
+service → repository → db
 ```
 
-- `--app-dir src`: src 폴더를 파이썬 모듈 경로로 인식시킴
-- `--reload`: 코드 변경 시 자동으로 서버 재시작
-- `--no-access-log`: uvicorn 기본 access log 비활성화 (커스텀 로그만 사용)
+### 5.4 외부 API 호출은 integrations 사용
 
-실행 후 http://localhost:8000/docs 에서 API 문서를 확인할 수 있습니다.
+```
+service → integrations → external api
+```
 
----
+### 5.5 환경 설정은 core/config에서만
 
-# 9. 프로젝트 확장 방향
+`.env` 값을 직접 읽지 않고 반드시 `get_settings()`를 사용합니다.
 
-프로젝트가 커질 경우 다음과 같은 컴포넌트가 추가될 수 있습니다.
+### 5.6 도메인 단위로 확장
 
-* Redis 캐시
-* 메시지 큐
-* 검색 엔진
-* background worker
-* 인증 시스템
+새 기능 추가 시:
 
-이러한 컴포넌트는 integrations 레이어를 통해 연결합니다.
+```
+domain/orders/
+domain/products/
+domain/payments/
+```
 
----
-
-# 10. 핵심 원칙
-
-이 프로젝트는 다음 원칙을 기반으로 합니다.
-
-1. 책임 분리
-2. 비즈니스 로직 중심 구조
-3. 확장 가능한 디렉토리 구조
-4. 일관된 코드 작성 방식
+각 도메인은 `schemas.py`, `service.py`, `repository.py`를 포함합니다.
 
 ---
 
-이 문서와 프로젝트 구조를 기준으로
-새로운 기능을 추가할 때는 다음 순서를 따르면 됩니다.
+## 6. 예외 처리 규칙
 
-1. domain에 기능 추가
-2. service 작성
-3. repository 작성
-4. api router 작성
-5. dependencies 연결
+- 모든 커스텀 예외는 `AppException`을 상속합니다.
+- 예외 핸들러 등록은 `core/exceptions.py`의 `register_exception_handlers(app)`를 사용합니다.
+- `main.py`에서 직접 `@app.exception_handler`를 작성하지 않습니다.
 
-이 과정을 따르면 프로젝트 구조를 유지하면서 기능을 확장할 수 있습니다.
+### 6.1 예외 클래스
+
+| 클래스 | 상태 코드 | 용도 |
+|--------|----------|------|
+| `BadRequestException` | 400 | 잘못된 요청 |
+| `UnauthorizedException` | 401 | 인증 필요 |
+| `ForbiddenException` | 403 | 권한 없음 |
+| `NotFoundException` | 404 | 대상 없음 |
+| `ConflictException` | 409 | 중복/충돌 |
+
+---
+
+## 7. 미들웨어 규칙
+
+- `middleware("http")`는 **등록 역순**으로 실행됩니다.
+- `request_id_middleware`가 먼저 실행되어야 `log_requests`가 `request.state.request_id`를 사용할 수 있습니다.
+- 따라서 등록 순서: `request_id_middleware` → `log_requests`
+
+---
+
+## 8. API 버전 관리
+
+- 버전 기준 디렉토리: `api/v1/`, `api/v2/`
+- prefix: `/api/v1`
+- `api/route.py`에서 모든 버전 router를 include
+
+---
+
+## 9. 환경 설정 변수
+
+| 변수명 | 기본값 | 설명 |
+|--------|--------|------|
+| `ENV` | `local` | 실행 환경 |
+| `APP_NAME` | `fastapi-boilerplate` | 앱 이름 |
+| `APP_PORT` | `8000` | 서버 포트 |
+| `API_PREFIX` | `/api/v1` | API prefix |
+| `DB_URL` | `sqlite:///./db.sqlite3` | DB 연결 URL |
+| `LOG_LEVEL` | `INFO` | 로그 레벨 |
+| `LOG_FILE_PATH` | `logs/app.log` | 로그 파일 경로 |
+| `LOG_ROTATION` | `1 day` | 로그 순환 주기 |
+| `LOG_RETENTION` | `7 days` | 로그 보관 기간 |
+| `DOCKER_IMAGE_NAME` | `fastapi-boilerplate` | Docker 이미지명 |
+| `DOCKER_IMAGE_TAG` | `latest` | Docker 이미지 태그 |
+| `DOCKER_CONTAINER_NAME` | `fastapi-boilerplate` | Docker 컨테이너명 |
+
+---
+
+## 10. 기능 확장 순서
+
+새로운 기능을 추가할 때 다음 순서를 따릅니다:
+
+1. `domain/{도메인}/`에 디렉토리 생성 → `schemas.py`, `service.py`, `repository.py` 작성
+2. `dependencies/`에 service 주입 함수 작성
+3. `api/v1/`에 router 작성
+4. `api/route.py`에 router include
+5. 필요시 `db/models/`에 SQLAlchemy 모델 추가
+6. 테스트 코드 작성 (`tests/`)
+
+---
+
+## 11. 의존성
+
+### Runtime
+- fastapi >= 0.135.1
+- uvicorn >= 0.41.0
+- sqlalchemy >= 2.0.48
+- alembic >= 1.18.4
+- pydantic-settings >= 2.13.1
+- httpx >= 0.28.1
+- loguru >= 0.7.3
+
+### Dev
+- pytest >= 9.0.2
+- ruff >= 0.15.5
+- mypy >= 1.19.1

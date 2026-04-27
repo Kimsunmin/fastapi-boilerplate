@@ -18,6 +18,10 @@ dependencies = [
 dev = [
     "httpx>=0.28.1",
     "mypy>=1.19.1",
+    "pydantic[email]>=2.12.5",
     "pytest>=9.0.2",
     "ruff>=0.15.5",
 ]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
